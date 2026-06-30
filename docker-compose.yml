@@ -1,0 +1,39 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hello-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-hello}
+      MYSQL_USER: ${MYSQL_USER:-hello}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-hello}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpw}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpw}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  wildfly:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hello-wildfly
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-hello}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER: ${MYSQL_USER:-hello}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-hello}
+    ports:
+      - "8080:8080"
+      - "9990:9990"
+
+volumes:
+  mysql-data:

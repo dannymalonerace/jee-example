@@ -1,0 +1,8 @@
+</main>
+<footer class="border-t border-slate-200 mt-12">
+  <div class="max-w-3xl mx-auto px-4 py-6 text-center text-xs text-slate-500">
+    Jakarta EE 10 &middot; WildFly 30 &middot; MySQL 8 &middot; Flyway &middot; Tailwind CSS
+  </div>
+</footer>
+</body>
+</html>
