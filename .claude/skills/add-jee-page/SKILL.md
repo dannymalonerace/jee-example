@@ -5,10 +5,10 @@ description: Use when adding a new static/informational page (a new nav route li
 
 # Add a new page to the hello app
 
-A "page" in this app is always the same four parts wired together. Adding the
-servlet + JSP and stopping there *looks* done in the browser but leaves the build
-and docs behind. **All four parts below are required for every page — none is
-optional.** Pick three values up front and reuse them everywhere:
+A "page" in this app is always the same parts wired together. Adding the
+servlet + JSP and stopping there *looks* done in the browser but leaves the
+build, tests, and docs behind. **All parts below are required for every page —
+none is optional.** Pick three values up front and reuse them everywhere:
 
 - **PATH** — the URL after the context root, e.g. `/contact`
 - **TITLE** — the visible heading + nav label, e.g. `Contact`
@@ -94,21 +94,77 @@ convention every other page follows. Add a smoke test beside the existing ones
     }
 ```
 
-## Then: docs + verify (part of Definition of Done)
+## 5. Browser E2E test (Page Object Model) — `e2e/pom/`
+
+**Required.** The IT in part 4 is HTTP-level; every nav page also gets a
+**browser-level** test that hits the route the way a user does — clicking through
+the nav. This repo uses the **Page Object Model**: the page's locators live in a
+class under `e2e/pom/pages/`, and the spec reads as intent. Two small additions,
+mirroring `ContactPage`:
+
+**a. Page object — `e2e/pom/pages/<Title>Page.ts`** (copy `ContactPage.ts`, swap
+the three values):
+
+```ts
+import { type Page, type Locator } from '@playwright/test';
+
+/** The <TITLE> page (<navkey>.jsp) at /hello/<path>. */
+export class ContactPage {                                              // <Title>Page
+  readonly heading: Locator;
+
+  constructor(private readonly page: Page) {
+    this.heading = page.getByRole('heading', { name: 'Contact', level: 1 });  // TITLE
+  }
+
+  async goto(): Promise<void> {
+    await this.page.goto('/hello/contact');                            // PATH
+  }
+}
+```
+
+**b. Nav test — add a case to `e2e/pom/tests/navigation.spec.ts`.** The
+`NavBar.link(name)` locator is generic, so no NavBar change is needed:
+
+```ts
+import { ContactPage } from '../pages/ContactPage';                     // <Title>Page
+
+test('can navigate to the Contact page from the nav', async ({ page }) => {  // TITLE
+  const home = new HomePage(page);
+  await home.goto();
+  await home.nav.link('Contact').click();                              // TITLE
+
+  const contact = new ContactPage(page);
+  await expect(page).toHaveURL(/\/hello\/contact$/);                   // PATH
+  await expect(contact.heading).toBeVisible();
+});
+```
+
+Also add the new nav label to the existing **"nav exposes the main sections"**
+assertions in the same file, so the link's presence is covered too.
+
+## Then: docs + rebuild + run the E2E suite (Definition of Done)
 
 - **README** — add the new route to the page list under "Run locally" (e.g.
   `` - `/hello/contact` — … ``). Adding a nav page is user-facing.
+
 <!-- DISABLED FOR DEMO — do NOT run this step. `./mvnw clean verify` builds a
      Testcontainers image and runs the full IT suite (~10+ min), too slow for a
      live demo. Re-enable by uncommenting when the full gate is wanted again.
 - **Verify** — `./mvnw clean verify` must be green (unit + IT + the 80% gate).
   Don't claim done until you've seen it pass.
 -->
-- **Rebuild?** — the WAR is baked into the image, so the new page only appears
+
+- **Rebuild** — the WAR is baked into the image, so the new page only appears
   after a rebuild. **Ask the user whether to rebuild the app** (via the
-  **rebuild-app** skill) — don't rebuild automatically. If they say yes, rebuild,
-  then hit the route and confirm the page renders, matches the other pages, and
-  the nav link highlights.
+  **rebuild-app** skill) — don't rebuild automatically.
+
+- **Run the POM E2E suite** — the browser test from part 5 hits the *running*
+  app, so it can only pass **after** the rebuild. Once the app is rebuilt, run
+  the POM suite via the **e2e-playwright-pom** skill (or directly from `e2e/`:
+  `npx playwright test --config playwright.pom.config.ts`). Confirm it's green,
+  **including the new test**, then hit the route in a browser and check the page
+  renders, matches the other pages, and the nav link highlights. Don't claim the
+  page is done until the POM suite passes.
 
 ## Checklist (all required)
 
@@ -118,9 +174,11 @@ convention every other page follows. Add a smoke test beside the existing ones
 | 2 | `<navkey>.jsp` | header/footer included, dumb JSP, looks & feels like `about.jsp` |
 | 3 | nav link in `header.jspf` | `activeNav == 'NAVKEY'` matches the servlet |
 | 4 | test in `HelloAppIT` | GET PATH → 200 + body contains TITLE |
-| 5 | README page list | new route listed |
-| 6 | ask to rebuild | asked the user whether to rebuild via **rebuild-app** |
+| 5 | POM object + nav test | `e2e/pom/pages/<Title>Page.ts` + case in `navigation.spec.ts` |
+| 6 | README page list | new route listed |
+| 7 | ask to rebuild | asked the user whether to rebuild via **rebuild-app** |
+| 8 | POM suite green | `npx playwright test --config playwright.pom.config.ts` passes incl. the new test |
 
 <!-- DISABLED FOR DEMO — re-enable together with the Verify step above:
-| 7 | `./mvnw clean verify` | green, including JaCoCo 80% gate |
+| 9 | `./mvnw clean verify` | green, including JaCoCo 80% gate |
 -->
